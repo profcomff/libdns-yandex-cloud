@@ -1,5 +1,8 @@
-module github.com/libdns/template
+module github.com/profcomff/libdns-yandex-cloud
 
-go 1.18
+go 1.21.5
 
-require github.com/libdns/libdns v0.2.1
+require (
+	github.com/golang-jwt/jwt/v5 v5.2.0
+	github.com/libdns/libdns v0.2.1
+)

@@ -1,53 +1,82 @@
-// Package libdnstemplate implements a DNS record management client compatible
-// with the libdns interfaces for <PROVIDER NAME>. TODO: This package is a
-// template only. Customize all godocs for actual implementation.
-package libdnstemplate
+package libdns_yandex_cloud
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/libdns/libdns"
+    "context"
+    "strings"
+    "github.com/libdns/libdns"
 )
 
-// TODO: Providers must not require additional provisioning steps by the callers; it
-// should work simply by populating a struct and calling methods on it. If your DNS
-// service requires long-lived state or some extra provisioning step, do it implicitly
-// when methods are called; sync.Once can help with this, and/or you can use a
-// sync.(RW)Mutex in your Provider struct to synchronize implicit provisioning.
-
-// Provider facilitates DNS record manipulation with <TODO: PROVIDER NAME>.
 type Provider struct {
-	// TODO: put config fields here (with snake_case json
-	// struct tags on exported fields), for example:
-	APIToken string `json:"api_token,omitempty"`
+    ServiceAccountConfigPath string
+    ServiceConfigParsed serviceConfig
+    AuthAPIToken string `json:"auth_api_token"`
+}
+
+func (p *Provider) UpdateApiToken() (error) {
+    if p.ServiceConfigParsed == (serviceConfig{}) {
+        parseServiceConfig(p.ServiceAccountConfigPath, &p.ServiceConfigParsed)
+    }
+    token, err := getIAMToken(p.ServiceConfigParsed)
+    if err != nil {
+        return err
+    }
+    p.AuthAPIToken = token
+    return nil
 }
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+    p.UpdateApiToken()
+    records, err := getAllRecords(ctx, p.AuthAPIToken, p.ServiceConfigParsed.DnsZoneId)
+    if err != nil {
+        return nil, err
+    }
+
+    return records, nil
 }
 
 // AppendRecords adds records to the zone. It returns the records that were added.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+    p.UpdateApiToken()
+    newRecords, err := updateRecords(ctx, p.AuthAPIToken, p.ServiceConfigParsed.DnsZoneId, records, "ADD")
+    if err != nil {
+        return nil, err
+    }
+
+    return newRecords, nil
 }
 
-// SetRecords sets the records in the zone, either by updating existing records or creating new ones.
-// It returns the updated records.
-func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
-}
-
-// DeleteRecords deletes the records from the zone. It returns the records that were deleted.
+// DeleteRecords deletes the records from the zone.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+    p.UpdateApiToken()
+    _, err := updateRecords(ctx, p.AuthAPIToken, p.ServiceConfigParsed.DnsZoneId, records, "DELETE")
+    if err != nil {
+        return nil, err
+    }
+
+    return records, nil
+}
+
+// SetRecords sets the records in the zone, either by updating existing records
+// or creating new ones. It returns the updated records.
+func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
+    p.UpdateApiToken()
+    setRecords, err := upsertRecords(ctx, p.AuthAPIToken, p.ServiceConfigParsed.DnsZoneId, records, "MERGE")
+    if err != nil {
+        return setRecords, err
+    }
+    return records, nil
+}
+
+// unFQDN trims any trailing "." from fqdn. Hetzner's API does not use FQDNs.
+func unFQDN(fqdn string) string {
+    return strings.TrimSuffix(fqdn, ".")
 }
 
 // Interface guards
 var (
-	_ libdns.RecordGetter   = (*Provider)(nil)
-	_ libdns.RecordAppender = (*Provider)(nil)
-	_ libdns.RecordSetter   = (*Provider)(nil)
-	_ libdns.RecordDeleter  = (*Provider)(nil)
+    _ libdns.RecordGetter   = (*Provider)(nil)
+    _ libdns.RecordAppender = (*Provider)(nil)
+    _ libdns.RecordSetter   = (*Provider)(nil)
+    _ libdns.RecordDeleter  = (*Provider)(nil)
 )
