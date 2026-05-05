@@ -137,11 +137,10 @@ func getAllRecords(ctx context.Context, token string, zoneID string) ([]libdns.R
         if err != nil{
             return []libdns.Record{}, err
         }
-        records = append(records, libdns.Record{
-            ID:    r.ID,
+        records = append(records, libdns.RR{
             Type:  r.Type,
             Name:  r.Name,
-            Value: r.Data[0],
+            Data:  r.Data[0],
             TTL:   time.Duration(intTtl) * time.Second,
         })
     }
@@ -160,11 +159,12 @@ func upsertRecords(ctx context.Context, token string, zoneID string, rs []libdns
         return []libdns.Record{}, err
     }
     for _, r := range rs{
+        rr := r.RR()
         recordData := record{
-        Type: r.Type,
-        Name: normalizeRecordName(r.Name, zoneName),
-        Data: []string{r.Value},
-        TTL:  fmt.Sprint(r.TTL.Seconds()),
+            Type: rr.Type,
+            Name: normalizeRecordName(rr.Name, zoneName),
+            Data: []string{rr.Data},
+            TTL:  fmt.Sprint(rr.TTL.Seconds()),
         }
         if method == "DELETE" {
             reqData.Replacements = append(reqData.Replacements, recordData)
@@ -206,11 +206,12 @@ func updateRecords(ctx context.Context, token string, zoneID string, rs []libdns
     }
 
     for _, r := range rs{
+        rr := r.RR()
         recordData := record{
-            Type: r.Type,
-            Name: normalizeRecordName(r.Name, zoneName),
-            Data: []string{r.Value},
-            TTL:  fmt.Sprint(r.TTL.Seconds()),
+            Type: rr.Type,
+            Name: normalizeRecordName(rr.Name, zoneName),
+            Data: []string{rr.Data},
+            TTL:  fmt.Sprint(rr.TTL.Seconds()),
         }
         if method == "DELETE" {
             reqData.Deletions = append(reqData.Deletions, recordData)
@@ -245,12 +246,11 @@ func updateRecords(ctx context.Context, token string, zoneID string, rs []libdns
     res := make([]libdns.Record, 0)
     for _, r := range resultList{
         intTtl, _ := strconv.Atoi(r.TTL)
-        res = append(res, libdns.Record{
-        ID:    result.ID,
-        Type:  r.Type,
-        Name:  normalizeRecordName(r.Name, zoneName),
-        Value: r.Data[0],
-        TTL:   time.Duration(intTtl) * time.Second,
+        res = append(res, libdns.RR{
+            Type:  r.Type,
+            Name:  normalizeRecordName(r.Name, zoneName),
+            Data:  r.Data[0],
+            TTL:   time.Duration(intTtl) * time.Second,
         })
     }
     return res, nil
